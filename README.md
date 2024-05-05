@@ -2,7 +2,7 @@
 Equipo: Data Girls
 
 Integrantes:
-Kathia Ruiz
-Karla Sánchez
-Jazmin Cortez
+Kathia Ruiz,
+Karla Sánchez,
+Jazmin Cortez,
 Nayeli Peña
