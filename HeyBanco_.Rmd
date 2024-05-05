@@ -1,0 +1,235 @@
+---
+title: "HeyBanco"
+author: "Data girls"
+date: "5/4/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+#Instalar paquetes y cargar librerías
+
+#install.packages(stringi)
+library(stringi)
+library(tidyverse)
+library(tm)
+library(lubridate)
+library(ggplot2)
+library(topicmodels)
+library(hunspell)
+library(dplyr)
+library(syuzhet)
+library(RColorBrewer)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Importar archivo
+df <- read.csv("/Users/karla/Desktop/Datathon/HeyBanco_limpio.csv")
+```
+
+```{r message=FALSE, warning=FALSE}
+# Visualizar estructura interna del data frame
+str(df)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Cambiar nombre de columnas
+names(df) <- c("Fecha", "Hora", "Comentario")
+```
+
+```{r message=FALSE, warning=FALSE}
+# Cambiar tipo de datos
+df$Fecha <- as.Date(df$Fecha)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Comprobar cambio de tipo de dato
+str(df)
+```
+
+```{r}
+# Corpus
+corpus <- Corpus(VectorSource(df$Comentario))
+
+# Preprocesamiento del corpus (Python)
+```
+
+```{r}
+# Crear la matriz
+frecuencias <- TermDocumentMatrix(corpus, 
+                              control = list(wordLengths = c(1, Inf)))
+```
+
+```{r}
+inspect(frecuencias[1:10,])
+```
+
+```{r}
+# Encontrar palabras más usadas
+findFreqTerms(frecuencias, lowfreq = 20, highfreq = Inf)
+```
+
+```{r}
+# Convertir la matriz a un data frame
+m <- as.matrix(frecuencias)
+v <- sort(rowSums(m), decreasing = TRUE)
+d <- data.frame(word = names(v), freq = v)
+```
+
+```{r}
+# Seleccionar las palabras más repetidas
+top_20 <- head(d, 20)
+
+palabras_interesantes <- c("gracias", "heybanco", "tarjeta", "mejor", 
+                           "crédito", "cuenta", "app", "excelente", "mensaje", "recomiendo")
+
+# Filtrar el dataframe top_10 para incluir solo las palabras de interés
+top_palabras_interesantes <- top_20[top_20$word %in% palabras_interesantes, ]
+
+# Crear el gráfico de barras de las palabras particulares
+ggplot(top_palabras_interesantes, aes(x = reorder(word, desc(freq)), y = freq)) +
+  geom_bar(stat = "identity", fill = "black") +
+  geom_text(aes(label = freq), size = 3, vjust = -0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        panel.background = element_rect(fill = "transparent")) +
+  xlab("") +
+  scale_y_continuous(breaks = NULL) +
+  ylab("") +
+  ggtitle("Frecuencia de palabras particulares")
+```
+
+```{r}
+findAssocs(frecuencias,terms = "problema",0.3)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "tarjeta",0.2)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "crédito",0.3)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "excelente",0.2)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "heybanco",0.2)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "recomiendo",0.2)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "app",0.2)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "pal",0.2)
+```
+
+```{r}
+findAssocs(frecuencias,terms = "cuenta",0.3)
+```
+
+```{r}
+# Eliminar documentos vacíos o con muy pocas palabras
+corpus <- corpus[sapply(corpus, function(x) length(unlist(strsplit(as.character(x), " ")))) > 1]
+
+# Crear la matriz Document-Term (dtm)
+dtm <- DocumentTermMatrix(corpus)
+
+# Aplicar el modelo LDA
+lda_model <- LDA(dtm, k = 3)  # "k" es el número de tópicos
+
+# Mostrar los términos más frecuentes para cada tópico
+terms(lda_model)
+```
+
+```{r}
+# Obtener los términos más frecuentes para cada tópico
+top_words <- terms(lda_model, 10)
+
+# Imprimir los términos más frecuentes para cada tópico
+print(top_words)
+```
+
+```{r}
+# Crear una nueva columna para el mes
+df$mes <- format(df$Fecha, "%Y-%m")
+
+# Contar el número de tweets por mes
+tweets_por_mes <- df %>%
+  group_by(mes) %>%
+  summarise(num_tweets = n())
+
+# Graficar el número de tweets por mes
+ggplot(tweets_por_mes, aes(x = mes, y = num_tweets)) +
+  geom_bar(stat = "identity", fill = "black") +
+  geom_text(aes(label = num_tweets), vjust = -0.5, size = 3) +  # Añadir etiquetas a las barras
+  labs(title = "Número de Tweets por Mes",
+       x = "Mes",
+       y = "") +
+  scale_y_continuous(breaks = NULL) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.background = element_rect(fill = "transparent"))
+```
+
+```{r}
+# Convertir la columna "Hora" a formato de fecha y hora
+df$fecha_hora <- as.POSIXct(df$Hora, format = "%Y-%m-%d %H:%M:%S")
+
+# Filtrar los registros que no tienen NA en la columna "Hora"
+df <- df %>% 
+  filter(!is.na(fecha_hora))
+
+# Extraer la hora de la columna "fecha_hora"
+df$hora <- format(df$fecha_hora, "%H")
+
+# Contar el número de registros (tweets) por hora
+registros_por_hora <- df %>%
+  group_by(hora) %>%
+  summarise(num_registros = n())
+
+# Graficar el número de registros por hora
+ggplot(registros_por_hora, aes(x = hora, y = num_registros)) +
+  geom_bar(stat = "identity", fill = "black") +
+  labs(title = "Número de Registros por Hora",
+       x = "Hora",
+       y = "Número de Registros") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(registros_por_hora, aes(x = hora, y = num_registros, group = 1)) +
+  geom_line(color = "black") +  # Línea que conecta los puntos
+  geom_point(color = "black", size = 3) +  # Puntos para cada hora
+  labs(title = "Número de tweets por hora",
+       x = "Hora",
+       y = "Número de tweets") +
+  theme_minimal()
+```
+
+```{r}
+sentimientos_df <- get_nrc_sentiment(df$Comentario, language = "spanish")
+
+barplot(
+  colSums(prop.table(sentimientos_df[,1:8])),
+  space = 0.2,
+  horiz = FALSE,
+  las = 1,
+  cex.names = 0.7,
+  col = brewer.pal(n = 8, name = "Set3"),
+  main = "Análisis de Sentimientos de los Tweets",
+  xlab = "Emociones"
+)
+```
+
+
+
+
